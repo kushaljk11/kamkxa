@@ -29,17 +29,24 @@ self.addEventListener('activate', (event) => {
 // Fetch: Network first for navigation & APIs; Cache first / stale-while-revalidate for static assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Skip non-GET requests
+  if (request.method !== 'GET') return;
+
   const url = new URL(request.url);
 
-  // Skip non-GET requests and external API calls
-  if (request.method !== 'GET') return;
-  if (url.pathname.startsWith('/api/')) return;
+  // Skip cross-origin requests (e.g. backend API on different domain)
+  if (url.origin !== self.location.origin) return;
+
+  // Skip local API calls
+  if (url.pathname.startsWith('/api')) return;
 
   // SPA navigation fallback to cached index.html when offline
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => {
-        return caches.match('/index.html');
+      fetch(request).catch(async () => {
+        const cached = await caches.match('/index.html');
+        return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
       })
     );
     return;
@@ -47,35 +54,38 @@ self.addEventListener('fetch', (event) => {
 
   // Static assets: cache-first with network refresh
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
+    caches.match(request).then(async (cachedResponse) => {
       if (cachedResponse) {
-        // Fetch background update
-        fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, networkResponse.clone());
-            });
-          }
-        }).catch(() => {});
+        // Fetch background update for cache
+        fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, networkResponse.clone());
+              });
+            }
+          })
+          .catch(() => {});
         return cachedResponse;
       }
 
-      return fetch(request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+      try {
+        const response = await fetch(request);
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
         }
-
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseToCache);
-        });
         return response;
-      }).catch(() => {
+      } catch (err) {
         // Fallback for image/icon requests if offline
         if (request.destination === 'image') {
-          return caches.match('/icon.svg');
+          const iconFallback = await caches.match('/icon.svg');
+          if (iconFallback) return iconFallback;
         }
-      });
+        return new Response('Resource unavailable offline', { status: 503 });
+      }
     })
   );
 });
