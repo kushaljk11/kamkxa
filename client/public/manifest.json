@@ -1,0 +1,36 @@
+{
+  "name": "GoTaskManager",
+  "short_name": "GoTaskManager",
+  "description": "Responsive, installable personal task, project, and deadline manager",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F7F8FA",
+  "theme_color": "#6366F1",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "My Day",
+      "url": "/my-day",
+      "description": "View today's agenda"
+    },
+    {
+      "name": "Tasks",
+      "url": "/tasks",
+      "description": "View all scheduled work"
+    },
+    {
+      "name": "Inbox",
+      "url": "/inbox",
+      "description": "Quick capture unorganized thoughts"
+    }
+  ]
+}
