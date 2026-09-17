@@ -15,7 +15,7 @@ export default defineConfig({
     open: false,
     proxy: {
       "/api": {
-        target: "http://localhost:5000", "https://kamkxabackend.vercel.app/",
+        target: "http://localhost:5000",
         changeOrigin: true,
         secure: false,
       },
