@@ -8,13 +8,45 @@ const { isDBConnected } = require('./config/db');
 const app = express();
 
 // Security headers
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
-// CORS configuration
-const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+// Resilient CORS configuration
+const configuredClientUrls = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((url) => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://kamkxa.vercel.app',
+  ...configuredClientUrls,
+];
+
 app.use(
   cors({
-    origin: clientUrl,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.trim().replace(/\/+$/, '');
+      const isAllowed =
+        allowedOrigins.some((allowed) => cleanOrigin === allowed) ||
+        cleanOrigin.endsWith('.vercel.app') ||
+        cleanOrigin.includes('localhost');
+
+      if (isAllowed) {
+        // Echo back the exact clean origin so browser matches precisely
+        callback(null, cleanOrigin);
+      } else {
+        console.warn(`[CORS Blocked] Origin "${origin}" not permitted. Allowed:`, allowedOrigins);
+        callback(new Error(`Not allowed by CORS: ${origin}`));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
